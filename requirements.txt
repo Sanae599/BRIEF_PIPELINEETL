@@ -3,4 +3,3 @@ requests
 gtfs-realtime-bindings
 snowflake-connector-python
 apache-airflow-providers-snowflake==6.5.2
-

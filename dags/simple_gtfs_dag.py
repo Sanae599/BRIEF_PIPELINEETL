@@ -1,7 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.snowflake.operators.snowflake import SnowflakeOperator
-from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from datetime import datetime
 import os
 import requests
@@ -10,27 +9,29 @@ from google.transit import gtfs_realtime_pb2
 import zipfile
 import logging
 
-#Charger .env
 load_dotenv()
+import requests
+from google.transit import gtfs_realtime_pb2
 
-# URLs
 GTFS_STATIC_URL = os.getenv("GTFS_STATIC_URL")
 GTFS_RT_TU_URL = os.getenv("GTFS_RT_TU_URL")
 GTFS_RT_VP_URL = os.getenv("GTFS_RT_VP_URL")
 
-# Dossiers dans le conteneur
+#Dossiers dans le conteneur
 DATA_DIR = "/opt/airflow/data"
 EXPORTS_DIR = "/opt/airflow/exports"
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(EXPORTS_DIR, exist_ok=True)
 
-UA = {"User-Agent": "airflow-gtfs-demo/1.0"}  
+UA = {"User-Agent": "airflow-gtfs-demo/1.0"}
 
 #Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def download_file(url: str, filename: str):
+    os.makedirs(DATA_DIR, exist_ok=True)
     resp = requests.get(url, timeout=30, headers=UA)
     resp.raise_for_status()
     path = os.path.join(DATA_DIR, filename)
@@ -39,8 +40,10 @@ def download_file(url: str, filename: str):
     print(f" Fichier téléchargé : {path}")
     return path
 
+
 def download_gtfs_static():
     zip_path = download_file(GTFS_STATIC_URL, "gtfs_static.zip")
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
 
     # Extraction directement dans exports
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
@@ -48,6 +51,7 @@ def download_gtfs_static():
     print(f"Contenu du GTFS static extrait dans {EXPORTS_DIR}")
 
     return EXPORTS_DIR
+
 
 def export_trip_updates():
     pb_path = download_file(GTFS_RT_TU_URL, "trip_updates.pb")
@@ -62,6 +66,7 @@ def export_trip_updates():
     print(f" Export TripUpdates : {out_txt}")
     return out_txt
 
+
 def export_vehicle_positions():
     pb_path = download_file(GTFS_RT_VP_URL, "vehicle_positions.pb")
     feed = gtfs_realtime_pb2.FeedMessage()
@@ -75,28 +80,12 @@ def export_vehicle_positions():
     print(f" Export VehiclePositions : {out_txt}")
     return out_txt
 
-#Snowflake
-query1 = [
-    """select 1;""",
-    """show tables in database abcd_db;""",
-]
-
-
-def count1(**context):
-    dwh_hook = SnowflakeHook(snowflake_conn_id="snowflake_conn")
-    result = dwh_hook.get_first("select count(*) from abcd_db.public.test3")
-    logging.info("Number of rows in `abcd_db.public.test3`  - %s", result[0])
-
-
-#fonction creation table 
-#charger les données
-#connexion snoflake
 
 #Définition du DAG
 with DAG(
-    dag_id="simple_gtfs_dag",
+    dag_id="gtfs_dag",
     start_date=datetime(2025, 9, 3),
-    schedule="@daily", 
+    schedule="@daily",
     catchup=False,
     tags=["GTFS", "demo", "Snowflake"],
 ) as dag:
@@ -116,16 +105,25 @@ with DAG(
         python_callable=export_vehicle_positions,
     )
 
-    snowflake_query = SnowflakeOperator(
-        task_id="snowflake_query",
-        sql=query1,
-        snowflake_conn_id="snowflake_conn",
+    # Petit ping SQL pour valider la connexion Snowflake (si la Connection existe)
+    snowflake_ping = SQLExecuteQueryOperator(
+        task_id="snowflake_ping",
+        conn_id="snowflake_conn",
+        sql="""
+            SELECT
+              CURRENT_ACCOUNT(),
+              CURRENT_REGION(),
+              CURRENT_ROLE(),
+              CURRENT_WAREHOUSE(),
+              CURRENT_DATABASE(),
+              CURRENT_SCHEMA();
+        """,
+        do_xcom_push=False, 
     )
 
-    snowflake_check = PythonOperator(
-        task_id="snowflake_check",
-        python_callable=count1,
+    # Ordre entre les tâches
+    (
+        task_gtfs_static
+        >> [task_trip_updates, task_vehicle_positions]
+        >> snowflake_ping
     )
-
-    # ordre
-    task_gtfs_static >> [task_trip_updates, task_vehicle_positions] >> snowflake_query >> snowflake_check 
