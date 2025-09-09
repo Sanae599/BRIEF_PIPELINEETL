@@ -139,9 +139,9 @@ def transform_vehicle_positions_to_csv():
     print(f"CSV créé : {vp_csv}")
     return vp_csv
 
-def map_to_midnight(execution_date, **context):
-    # force à pointer vers l’exécution du DAG daily de la même journée
+def map_to_2am(execution_date, **_):
     return execution_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
 
 # SQL pour tables BRONZE
 create_bronze_rt_tables_sql = [
@@ -186,7 +186,7 @@ with DAG(
         task_id="wait_for_static_today",
         external_dag_id="gtfs_static_daily",
         external_task_id="unzip_gtfs_static_zip", 
-        execution_date_fn=map_to_midnight,
+        execution_date_fn=map_to_2am,
         allowed_states=["success"],
         failed_states=["failed", "skipped"],
         poke_interval=60,   # check toutes les 60s
@@ -198,10 +198,7 @@ with DAG(
         task_id="export_trip_updates",
         python_callable=export_trip_updates,
     )
-    task_trip_stop_times= PythonOperator(
-        task_id="export_trip_stop_times",
-        python_callable=export_vehicle_positions,
-    )
+
     task_vehicle_positions = PythonOperator(
         task_id="export_vehicle_positions",
         python_callable=export_vehicle_positions,
@@ -210,11 +207,6 @@ with DAG(
     transform_tu_csv = PythonOperator(
         task_id="transform_trip_updates_to_csv",
         python_callable=transform_trip_updates_to_csv,
-    )
-
-    transform_st_csv = PythonOperator(
-    task_id="transform_trip_stop_times_to_csv",
-    python_callable=transform_trip_updates_to_csv,
     )
 
     transform_vp_csv = PythonOperator(
@@ -274,7 +266,7 @@ with DAG(
         task_id="put_trip_updates",
         conn_id="snowflake_conn",
         sql="""
-            PUT file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv')['trip_updates_csv'] }}
+            PUT 'file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv') }}'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
@@ -284,7 +276,7 @@ with DAG(
         task_id="put_trip_stops_times",
         conn_id="snowflake_conn",
         sql="""
-            PUT file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv')['trip_stops_times_csv'] }}
+            PUT 'file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv') }}'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
@@ -294,7 +286,7 @@ with DAG(
         task_id="put_vehicle_positions",
         conn_id="snowflake_conn",
         sql="""
-            PUT file://{{ ti.xcom_pull(task_ids='transform_vehicle_positions_to_csv') }}
+            PUT 'file://{{ ti.xcom_pull(task_ids='transform_vehicle_positions_to_csv') }}'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
@@ -341,9 +333,4 @@ with DAG(
 
     # Ordre
 
-    wait_for_static_today >> task_trip_updates >> task_trip_stop_times >> task_vehicle_positions >> transform_tu_csv >> transform_st_csv >> transform_vp_csv  >> snowflake_ping >> create_db >> create_schema >> create_bronze_rt_tables >> create_stage >> put_trip_updates >> put_trip_stops_times >> put_vehicle_positions >> copy_trip_updates >> copy_trip_stops_times >> copy_vehicle_positions
-
-
-
-
-
+    wait_for_static_today >> task_trip_updates >> task_vehicle_positions >> transform_tu_csv >> transform_vp_csv >> snowflake_ping >> create_db >> create_schema >> create_bronze_rt_tables >> create_stage >> put_trip_updates >> put_trip_stops_times >> put_vehicle_positions >> copy_trip_updates >> copy_trip_stops_times >> copy_vehicle_positions

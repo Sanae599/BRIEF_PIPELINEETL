@@ -195,8 +195,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-#config
-airflow.cfg
+#.
+.cfg
+.csv 
+.zip 
+.txt
+.pb
 
 # Cursor
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to

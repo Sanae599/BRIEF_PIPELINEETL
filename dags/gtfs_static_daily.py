@@ -112,7 +112,7 @@ create_bronze_static_tables_sql = [
 with DAG(
     dag_id="gtfs_static_daily",
     start_date=datetime(2025, 9, 3),
-    schedule="0 3 * * *",  # Tous les jours à 3h
+    schedule = "@daily", # minuit hors utc / tous les 2h paris
     catchup=False,
     tags=["GTFS", "static", "Snowflake"],
 ) as dag:
