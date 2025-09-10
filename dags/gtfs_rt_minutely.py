@@ -265,8 +265,8 @@ with DAG(
     put_trip_updates = SQLExecuteQueryOperator(
         task_id="put_trip_updates",
         conn_id="snowflake_conn",
-        sql="""
-            PUT 'file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv') }}'
+        sql=f"""
+            PUT 'file://{EXPORTS_DIR}/trip_updates.csv'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
@@ -275,8 +275,8 @@ with DAG(
     put_trip_stops_times = SQLExecuteQueryOperator(
         task_id="put_trip_stops_times",
         conn_id="snowflake_conn",
-        sql="""
-            PUT 'file://{{ ti.xcom_pull(task_ids='transform_trip_updates_to_csv') }}'
+        sql=f"""
+            PUT 'file://{EXPORTS_DIR}/trip_stops_times.csv'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
@@ -285,8 +285,8 @@ with DAG(
     put_vehicle_positions = SQLExecuteQueryOperator(
         task_id="put_vehicle_positions",
         conn_id="snowflake_conn",
-        sql="""
-            PUT 'file://{{ ti.xcom_pull(task_ids='transform_vehicle_positions_to_csv') }}'
+        sql=f"""
+            PUT 'file://{EXPORTS_DIR}/vehicle_positions.csv'
             @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
         """,
         do_xcom_push=False,
