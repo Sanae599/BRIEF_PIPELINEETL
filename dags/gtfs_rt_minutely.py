@@ -149,7 +149,8 @@ create_bronze_rt_tables_sql = [
     CREATE TABLE IF NOT EXISTS GTFS_DB.BRONZE.trip_updates (
         trip_id STRING,
         route_id STRING,
-        direction_id NUMBER
+        direction_id NUMBER,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
     );
     """,
     """
@@ -158,7 +159,8 @@ create_bronze_rt_tables_sql = [
         stop_sequence NUMBER,
         stop_id STRING,
         arrival_time NUMBER,
-        departure_time NUMBER
+        departure_time NUMBER,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
     );
     """,
     """
@@ -169,7 +171,8 @@ create_bronze_rt_tables_sql = [
         latitude FLOAT,
         longitude FLOAT,
         bearing FLOAT,
-        stop_id STRING
+        stop_id STRING,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
     );
     """
 ]
@@ -266,8 +269,8 @@ with DAG(
         task_id="put_trip_updates",
         conn_id="snowflake_conn",
         sql=f"""
-            PUT 'file://{EXPORTS_DIR}/trip_updates.csv'
-            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
+            PUT 'file://{EXPORTS_DIR}/trip_updates_*.csv'
+            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
         """,
         do_xcom_push=False,
     )
@@ -276,8 +279,8 @@ with DAG(
         task_id="put_trip_stops_times",
         conn_id="snowflake_conn",
         sql=f"""
-            PUT 'file://{EXPORTS_DIR}/trip_stops_times.csv'
-            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
+            PUT 'file://{EXPORTS_DIR}/trip_stops_times_*.csv'
+            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
         """,
         do_xcom_push=False,
     )
@@ -286,8 +289,8 @@ with DAG(
         task_id="put_vehicle_positions",
         conn_id="snowflake_conn",
         sql=f"""
-            PUT 'file://{EXPORTS_DIR}/vehicle_positions.csv'
-            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely OVERWRITE = TRUE;
+            PUT 'file://{EXPORTS_DIR}/vehicle_positions_*.csv'
+            @GTFS_DB.BRONZE.stage_gtfs_rt_minutely AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
         """,
         do_xcom_push=False,
     )
@@ -298,7 +301,7 @@ with DAG(
         task_id="copy_trip_updates",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.trip_updates
+            COPY INTO GTFS_DB.BRONZE.trip_updates (trip_id, route_id, direction_id)
             FROM @GTFS_DB.BRONZE.stage_gtfs_rt_minutely
             PATTERN = '.*trip_updates_.*\\.csv'
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
@@ -310,7 +313,7 @@ with DAG(
         task_id="copy_trip_stops_times",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.trip_stops_times
+            COPY INTO GTFS_DB.BRONZE.trip_stops_times (trip_id, stop_sequence, stop_id, arrival_time, departure_time)
             FROM @GTFS_DB.BRONZE.stage_gtfs_rt_minutely
             PATTERN = '.*trip_stops_times_.*\\.csv'
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
@@ -322,7 +325,7 @@ with DAG(
         task_id="copy_vehicle_positions",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.vehicle_positions
+            COPY INTO GTFS_DB.BRONZE.vehicle_positions (trip_id, route_id, vehicle_id, latitude, longitude, bearing, stop_id)
             FROM @GTFS_DB.BRONZE.stage_gtfs_rt_minutely
             PATTERN = '.*vehicle_positions_.*\\.csv'
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);

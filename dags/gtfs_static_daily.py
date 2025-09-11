@@ -65,7 +65,8 @@ create_bronze_static_tables_sql = [
         route_type NUMBER,
         route_url STRING,
         route_color STRING,
-        route_text_color STRING
+        route_text_color STRING,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
 
     );
     """,
@@ -75,11 +76,13 @@ create_bronze_static_tables_sql = [
         service_id STRING,
         trip_id STRING,
         trip_headsign STRING,
+        trip_short_name STRING,
         direction_id STRING,
         shape_id STRING,
-        block_id STRING,
         wheelchair_accessible NUMBER,
-        bikes_allowed NUMBER
+        bikes_allowed NUMBER,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
+
     );
     """,
     """
@@ -93,7 +96,9 @@ create_bronze_static_tables_sql = [
         location_type STRING,
         parent_station STRING,
         stop_timezone STRING,
-        wheelchair_boarding STRING
+        wheelchair_boarding STRING,
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
+
     );
     """,
     """
@@ -104,7 +109,9 @@ create_bronze_static_tables_sql = [
         stop_id STRING,
         stop_sequence NUMBER,
         pickup_type STRING,
-        drop_off_type STRING   
+        drop_off_type STRING,  
+        insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
+ 
     );
     """
 ]
@@ -198,7 +205,7 @@ with DAG(
         task_id="copy_routes",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.routes
+            COPY INTO GTFS_DB.BRONZE.routes (route_id, agency_id, route_short_name, route_long_name, route_type, route_url, route_color, route_text_color)
             FROM @GTFS_DB.BRONZE.stage_gtfs_static/routes.txt
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
         """,
@@ -209,7 +216,7 @@ with DAG(
         task_id="copy_trips",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.trips
+            COPY INTO GTFS_DB.BRONZE.trips (route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,shape_id,wheelchair_accessible,bikes_allowed)
             FROM @GTFS_DB.BRONZE.stage_gtfs_static/trips.txt
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
         """,
@@ -220,7 +227,7 @@ with DAG(
         task_id="copy_stops",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.stops
+            COPY INTO GTFS_DB.BRONZE.stops (stop_id, stop_code, stop_name, stop_lat, stop_lon, zone_id, location_type, parent_station, stop_timezone, wheelchair_boarding)
             FROM @GTFS_DB.BRONZE.stage_gtfs_static/stops.txt
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
         """,
@@ -231,7 +238,7 @@ with DAG(
         task_id="copy_stop_times",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.stop_times
+            COPY INTO GTFS_DB.BRONZE.stop_times (trip_id, arrival_time, departure_time, stop_id, stop_sequence, pickup_type, drop_off_type)
             FROM @GTFS_DB.BRONZE.stage_gtfs_static/stop_times.txt
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
         """,
