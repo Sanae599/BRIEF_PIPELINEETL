@@ -82,7 +82,7 @@ insert_stop_times_silver_sql = """
     FROM GTFS_DB.BRONZE.stop_times;
 """
 
-# ====================== SQL POUR TABLES REALTIME ======================
+#SQL POUR TABLES REALTIME
 
 create_trip_updates_silver_sql = """
     CREATE TABLE IF NOT EXISTS GTFS_DB.SILVER.trip_updates_silver (
@@ -219,7 +219,7 @@ with DAG(
     insert_trip_stops_times_silver = SQLExecuteQueryOperator(
         task_id="insert_trip_stops_times_silver", 
         conn_id="snowflake_conn", 
-        sql=insert_trip_stops_times_silver_sql)
+        sql=insert_trip_stops_times_srtver_sql)
 
     create_vehicle_positions_silver = SQLExecuteQueryOperator(
         task_id="create_vehicle_positions_silver", 
