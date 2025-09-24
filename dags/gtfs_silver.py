@@ -14,7 +14,7 @@ create_routes_silver_sql = """
         route_id STRING,
         agency_id STRING,
         route_long_name STRING,
-        route_type NUMBER,
+        route_type STRING,
         insert_date TIMESTAMP_NTZ DEFAULT CAST(CONVERT_TIMEZONE('Europe/Paris', CURRENT_TIMESTAMP()) AS TIMESTAMP_NTZ)
     );
 """

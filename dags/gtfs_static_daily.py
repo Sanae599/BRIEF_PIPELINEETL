@@ -62,7 +62,7 @@ create_bronze_static_tables_sql = [
         agency_id STRING,
         route_short_name STRING,
         route_long_name STRING,
-        route_type NUMBER,
+        route_type STRING,
         route_url STRING,
         route_color STRING,
         route_text_color STRING,
@@ -205,7 +205,8 @@ with DAG(
         task_id="copy_routes",
         conn_id="snowflake_conn",
         sql="""
-            COPY INTO GTFS_DB.BRONZE.routes (route_id, agency_id, route_short_name, route_long_name, route_type, route_url, route_color, route_text_color)
+            COPY INTO GTFS_DB.BRONZE.routes (route_id, agency_id, route_short_name, route_long_name, 
+            route_type, route_url, route_color, route_text_color)
             FROM @GTFS_DB.BRONZE.stage_gtfs_static/routes.txt
             FILE_FORMAT = (TYPE = CSV FIELD_OPTIONALLY_ENCLOSED_BY='"' SKIP_HEADER=1);
         """,
